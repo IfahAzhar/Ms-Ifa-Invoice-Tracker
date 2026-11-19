@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutor Invoice Tracker</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --border: #e3e6ea;
+    --text: #2b3138;
+    --muted: #6b7280;
+    --accent: #4a7dab;
+    --accent-soft: #eaf2f8;
+    --paid-bg: #e7f4ec;
+    --paid-text: #2e7d4f;
+    --unpaid-bg: #fdf0e7;
+    --unpaid-text: #b05c22;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 32px 20px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  header { margin-bottom: 24px; }
+  header h1 { font-size: 1.5rem; font-weight: 600; }
+  header p { color: var(--muted); font-size: 0.9rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
+  .card .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 14px; }
+
+  /* Invoice list */
+  .invoice-row {
+    display: grid;
+    grid-template-columns: 1.1fr 1.2fr 1.2fr 0.9fr 0.9fr 0.9fr;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    align-items: center;
+    background: #fff;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .invoice-row:hover { background: var(--accent-soft); }
+  .invoice-row.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .inv-num { font-weight: 600; font-size: 0.9rem; }
+  .inv-cell { font-size: 0.9rem; }
+  .inv-cell small { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    justify-self: end;
+  }
+  .badge.paid { background: var(--paid-bg); color: var(--paid-text); }
+  .badge.unpaid { background: var(--unpaid-bg); color: var(--unpaid-text); }
+  .total-cell { font-weight: 600; text-align: right; }
+
+  /* Summary */
+  .summary-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .stat {
+    flex: 1 1 180px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 4px; }
+  .stat.paid .value { color: var(--paid-text); }
+  .stat.unpaid .value { color: var(--unpaid-text); }
+  .stat.due .value { color: var(--accent); }
+
+  /* Editor */
+  .editor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.92rem;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  .status-toggle { display: flex; gap: 8px; }
+  .status-toggle button {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .status-toggle button.active-paid { background: var(--paid-bg); border-color: var(--paid-text); color: var(--paid-text); font-weight: 600; }
+  .status-toggle button.active-unpaid { background: var(--unpaid-bg); border-color: var(--unpaid-text); color: var(--unpaid-text); font-weight: 600; }
+  .editor-total {
+    grid-column: 1 / -1;
+    background: var(--accent-soft);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .editor-total .label { color: var(--muted); font-size: 0.85rem; }
+  .editor-total .value { font-size: 1.3rem; font-weight: 600; color: var(--accent); }
+  .empty-editor { color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tutor Invoice Tracker</h1>
+    <p>Sample data only — nothing is saved between visits.</p>
+  </header>
+
+  <!-- 1. Invoice list -->
+  <section class="card" id="list-section">
+    <h2>Invoice List</h2>
+    <p class="sub">Click an invoice to view or edit its details below.</p>
+    <div id="invoice-list"></div>
+  </section>
+
+  <!-- 2. Payment summary -->
+  <section class="card" id="summary-section">
+    <h2>Payment Summary</h2>
+    <p class="sub">Updates automatically as statuses and amounts change.</p>
+    <div class="summary-grid">
+      <div class="stat paid">
+        <div class="label">Paid Invoices</div>
+        <div class="value" id="stat-paid-count">0</div>
+        <div class="label" id="stat-paid-amount"></div>
+      </div>
+      <div class="stat unpaid">
+        <div class="label">Unpaid Invoices</div>
+        <div class="value" id="stat-unpaid-count">0</div>
+        <div class="label" id="stat-unpaid-amount"></div>
+      </div>
+      <div class="stat due">
+        <div class="label">Total Amount Due</div>
+        <div class="value" id="stat-total-due">RM 0.00</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Invoice editor -->
+  <!-- 3. Invoice editor -->
+  <section class="card" id="editor-section">
+    <h2>Invoice Editor</h2>
+    <p class="sub">Changes update the selected invoice immediately.</p>
+    <div id="editor-body"></div>
+  </section>
+
+  <footer style="text-align: center; color: var(--muted); font-size: 0.85rem; padding: 12px 0 4px;">
+    Ifa | 2026
+  </footer>
+</div>
+
+<script>
+  // Sample data (Malaysia-specific, fictional)
+  let invoices = [
+    { id: 1, number: "INV-2026-001", client: "Puan Aisyah Rahman", student: "Nurul Iman", hours: 8, rate: 60, status: "paid" },
+    { id: 2, number: "INV-2026-002", client: "Encik Lim Wei Chen", student: "Marcus Lim", hours: 12, rate: 55, status: "unpaid" },
+    { id: 3, number: "INV-2026-003", client: "Mrs. Kavitha Nair", student: "Anjali Nair", hours: 6, rate: 70, status: "unpaid" }
+  ];
+  let selectedId = invoices[0].id;
+
+  const rm = n => "RM " + n.toFixed(2);
+  const total = inv => inv.hours * inv.rate;
+
+  const listEl = document.getElementById("invoice-list");
+  const editorBody = document.getElementById("editor-body");
+
+  function renderList() {
+    listEl.innerHTML = "";
+    invoices.forEach(inv => {
+      const row = document.createElement("div");
+      row.className = "invoice-row" + (inv.id === selectedId ? " selected" : "");
+      row.innerHTML = `
+        <div class="inv-num">${esc(inv.number)}</div>
+        <div class="inv-cell"><small>Client</small>${esc(inv.client)}</div>
+        <div class="inv-cell"><small>Student</small>${esc(inv.student)}</div>
+        <div class="inv-cell"><small>Time</small>${esc(inv.hours)} hrs</div>
+        <div class="inv-cell total-cell"><small>Total</small>${rm(total(inv))}</div>
+        <span class="badge ${inv.status}">${inv.status === "paid" ? "Paid" : "Unpaid"}</span>
+      `;
+      row.addEventListener("click", () => { selectedId = inv.id; render(); });
+      listEl.appendChild(row);
+    });
+  }
+
+  function renderSummary() {
+    const paid = invoices.filter(i => i.status === "paid");
+    const unpaid = invoices.filter(i => i.status === "unpaid");
+    document.getElementById("stat-paid-count").textContent = paid.length;
+    document.getElementById("stat-paid-amount").textContent = rm(paid.reduce((s, i) => s + total(i), 0)) + " collected";
+    document.getElementById("stat-unpaid-count").textContent = unpaid.length;
+    document.getElementById("stat-unpaid-amount").textContent = rm(unpaid.reduce((s, i) => s + total(i), 0)) + " outstanding";
+    document.getElementById("stat-total-due").textContent = rm(unpaid.reduce((s, i) => s + total(i), 0));
+  }
+
+  function renderEditor() {
+    const inv = invoices.find(i => i.id === selectedId);
+    if (!inv) { editorBody.innerHTML = '<p class="empty-editor">Select an invoice above.</p>'; return; }
+    editorBody.innerHTML = `
+      <div class="editor-grid">
+        <div class="field">
+          <label>Invoice Number</label>
+          <input id="f-number" type="text" value="${esc(inv.number)}">
+        </div>
+        <div class="field">
+          <label>Client Name</label>
+          <input id="f-client" type="text" value="${esc(inv.client)}">
+        </div>
+        <div class="field">
+          <label>Student Name</label>
+          <input id="f-student" type="text" value="${esc(inv.student)}">
+        </div>
+        <div class="field">
+          <label>Time (hours)</label>
+          <input id="f-hours" type="number" min="0" step="0.5" value="${inv.hours}">
+        </div>
+        <div class="field">
+          <label>Rate (RM per hour)</label>
+          <input id="f-rate" type="number" min="0" step="1" value="${inv.rate}">
+        </div>
+        <div class="field">
+          <label>Payment Status</label>
+          <div class="status-toggle">
+            <button id="f-paid" class="${inv.status === "paid" ? "active-paid" : ""}">Paid</button>
+            <button id="f-unpaid" class="${inv.status === "unpaid" ? "active-unpaid" : ""}">Unpaid</button>
+          </div>
+        </div>
+        <div class="editor-total">
+          <span class="label">Invoice Total</span>
+          <span class="value" id="f-total">${rm(total(inv))}</span>
+        </div>
+      </div>
+    `;
+    const upd = (field, key, parse) => {
+      document.getElementById(field).addEventListener("input", e => {
+        inv[key] = parse ? parseFloat(e.target.value) || 0 : e.target.value;
+        render();
+      });
+    };
+    upd("f-number", "number");
+    upd("f-client", "client");
+    upd("f-student", "student");
+    upd("f-hours", "hours", true);
+    upd("f-rate", "rate", true);
+    document.getElementById("f-paid").addEventListener("click", () => { inv.status = "paid"; render(); });
+    document.getElementById("f-unpaid").addEventListener("click", () => { inv.status = "unpaid"; render(); });
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function render() {
+    renderList();
+    renderSummary();
+    renderEditor();
+  }
+
+  render();
+</script>
+</body>
+</html>
